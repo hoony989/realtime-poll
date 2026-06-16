@@ -1,37 +1,39 @@
-export interface Poll {
+export interface Room {
   id: string
   title: string
-  description: string | null
-  is_active: boolean
+  question: string | null
+  status: 'waiting' | 'open' | 'closed'
+  admin_token: string
+  multi_select: boolean
   created_at: string
-  allow_opinions: boolean
 }
 
-export interface PollOption {
+export interface RoomOption {
   id: string
-  poll_id: string
-  text: string
-  color: string
-  order_index: number
+  room_id: string
+  label: string
+  sort_order: number
+  color?: string
 }
 
 export interface Vote {
   id: string
-  poll_id: string
+  room_id: string
   option_id: string
-  session_id: string
+  voter_id: string
   created_at: string
 }
 
 export interface Opinion {
   id: string
-  poll_id: string
-  text: string
+  room_id: string
+  content: string
+  voter_id: string
   created_at: string
 }
 
-export interface PollWithResults extends Poll {
-  options: (PollOption & { vote_count: number })[]
+export interface RoomWithResults extends Room {
+  options: (RoomOption & { vote_count: number })[]
   total_votes: number
   opinions: Opinion[]
 }

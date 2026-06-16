@@ -1,67 +1,62 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Poll, PollOption } from '../types'
-import { PlusCircle, Trash2, BarChart2, Monitor, ExternalLink, ToggleLeft, ToggleRight } from 'lucide-react'
-
-const OPTION_COLORS = ['#3B82F6', '#A855F7', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4']
+import type { Room } from '../types'
+import { PlusCircle, Trash2, BarChart2, Monitor, ExternalLink } from 'lucide-react'
 
 export default function AdminPage() {
   const navigate = useNavigate()
-  const [polls, setPolls] = useState<Poll[]>([])
+  const [rooms, setRooms] = useState<Room[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [allowOpinions, setAllowOpinions] = useState(true)
+  const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(['', '', ''])
   const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    fetchPolls()
-  }, [])
+  useEffect(() => { fetchRooms() }, [])
 
-  async function fetchPolls() {
-    const { data } = await supabase.from('polls').select('*').order('created_at', { ascending: false })
-    setPolls(data || [])
+  async function fetchRooms() {
+    const { data } = await supabase.from('rooms').select('*').order('created_at', { ascending: false })
+    setRooms(data || [])
   }
 
-  async function createPoll() {
+  async function createRoom() {
     const validOptions = options.filter((o) => o.trim())
     if (!title.trim() || validOptions.length < 2) return
     setCreating(true)
 
-    const { data: poll, error } = await supabase
-      .from('polls')
-      .insert({ title: title.trim(), description: description.trim() || null, is_active: true, allow_opinions: allowOpinions })
+    const { data: room, error } = await supabase
+      .from('rooms')
+      .insert({ title: title.trim(), question: question.trim() || null, status: 'open' })
       .select()
       .single()
 
-    if (error || !poll) { setCreating(false); return }
+    if (error || !room) { setCreating(false); return }
 
-    const optionRows: Omit<PollOption, 'id'>[] = validOptions.map((text, i) => ({
-      poll_id: poll.id,
-      text: text.trim(),
-      color: OPTION_COLORS[i % OPTION_COLORS.length],
-      order_index: i,
+    const optionRows = validOptions.map((label, i) => ({
+      room_id: room.id,
+      label: label.trim(),
+      sort_order: i,
     }))
 
-    await supabase.from('poll_options').insert(optionRows)
-    setTitle(''); setDescription(''); setOptions(['', '', '']); setShowCreate(false); setCreating(false)
-    fetchPolls()
+    await supabase.from('options').insert(optionRows)
+    setTitle(''); setQuestion(''); setOptions(['', '', '']); setShowCreate(false); setCreating(false)
+    fetchRooms()
   }
 
-  async function toggleActive(poll: Poll) {
-    await supabase.from('polls').update({ is_active: !poll.is_active }).eq('id', poll.id)
-    fetchPolls()
+  async function toggleStatus(room: Room) {
+    const next = room.status === 'open' ? 'closed' : 'open'
+    await supabase.from('rooms').update({ status: next }).eq('id', room.id)
+    fetchRooms()
   }
 
-  async function deletePoll(id: string) {
+  async function deleteRoom(id: string) {
     if (!confirm('정말 삭제할까요? 모든 투표 데이터가 삭제됩니다.')) return
-    await supabase.from('votes').delete().eq('poll_id', id)
-    await supabase.from('opinions').delete().eq('poll_id', id)
-    await supabase.from('poll_options').delete().eq('poll_id', id)
-    await supabase.from('polls').delete().eq('id', id)
-    fetchPolls()
+    await supabase.from('votes').delete().eq('room_id', id)
+    await supabase.from('opinions').delete().eq('room_id', id)
+    await supabase.from('options').delete().eq('room_id', id)
+    await supabase.from('rooms').delete().eq('id', id)
+    fetchRooms()
   }
 
   return (
@@ -85,42 +80,40 @@ export default function AdminPage() {
             <h2 className="text-xl font-semibold mb-5">새 투표 만들기</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-gray-400 mb-1.5 block">질문 *</label>
+                <label className="text-sm text-gray-400 mb-1.5 block">제목 *</label>
                 <input
                   className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  placeholder="예: 어떤 실행 과제를 가장 시급하게 보고 있을까요?"
+                  placeholder="예: AI 도입 우선순위 투표"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400 mb-1.5 block">부제목 (선택)</label>
+                <label className="text-sm text-gray-400 mb-1.5 block">질문 (선택)</label>
                 <input
                   className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  placeholder="추가 설명을 입력하세요"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="예: 어떤 실행 과제를 가장 시급하게 보고 있을까요?"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
                 />
               </div>
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">투표 항목 * (최소 2개)</label>
                 <div className="space-y-2">
                   {options.map((opt, i) => (
-                    <div key={i} className="flex gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full mt-4 flex-shrink-0"
-                        style={{ backgroundColor: OPTION_COLORS[i % OPTION_COLORS.length] }}
-                      />
+                    <div key={i} className="flex gap-2 items-center">
+                      <span className="w-5 h-5 rounded-full flex-shrink-0 text-xs flex items-center justify-center text-white font-bold"
+                        style={{ backgroundColor: ['#3B82F6','#A855F7','#22C55E','#F59E0B','#EF4444','#06B6D4'][i % 6] }}>
+                        {i + 1}
+                      </span>
                       <input
                         className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                         placeholder={`항목 ${i + 1}`}
                         value={opt}
-                        onChange={(e) => {
-                          const next = [...options]; next[i] = e.target.value; setOptions(next)
-                        }}
+                        onChange={(e) => { const n = [...options]; n[i] = e.target.value; setOptions(n) }}
                       />
                       {options.length > 2 && (
-                        <button onClick={() => setOptions(options.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-400 mt-2">
+                        <button onClick={() => setOptions(options.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-400">
                           <Trash2 size={16} />
                         </button>
                       )}
@@ -133,15 +126,9 @@ export default function AdminPage() {
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setAllowOpinions(!allowOpinions)} className="text-gray-300">
-                  {allowOpinions ? <ToggleRight size={32} className="text-green-400" /> : <ToggleLeft size={32} />}
-                </button>
-                <span className="text-sm text-gray-300">의견 텍스트 수집 허용</span>
-              </div>
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={createPoll}
+                  onClick={createRoom}
                   disabled={creating || !title.trim() || options.filter(o => o.trim()).length < 2}
                   className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-colors"
                 >
@@ -156,45 +143,48 @@ export default function AdminPage() {
         )}
 
         <div className="space-y-4">
-          {polls.length === 0 ? (
+          {rooms.length === 0 ? (
             <div className="text-center py-20 text-gray-500">
               <BarChart2 size={48} className="mx-auto mb-3 opacity-30" />
               <p>아직 투표가 없습니다. 첫 번째 투표를 만들어보세요!</p>
             </div>
           ) : (
-            polls.map((poll) => (
-              <div key={poll.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center justify-between hover:border-gray-700 transition-colors">
+            rooms.map((room) => (
+              <div key={room.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center justify-between hover:border-gray-700 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`w-2 h-2 rounded-full ${poll.is_active ? 'bg-green-400' : 'bg-gray-600'}`} />
-                    <h3 className="font-semibold text-white truncate">{poll.title}</h3>
+                    <span className={`w-2 h-2 rounded-full ${room.status === 'open' ? 'bg-green-400' : room.status === 'waiting' ? 'bg-yellow-400' : 'bg-gray-600'}`} />
+                    <h3 className="font-semibold text-white truncate">{room.title}</h3>
                   </div>
-                  <p className="text-xs text-gray-500 ml-4">
-                    {new Date(poll.created_at).toLocaleString('ko-KR')} · {poll.is_active ? '진행 중' : '종료'}
+                  {room.question && <p className="text-xs text-gray-500 ml-4 truncate">{room.question}</p>}
+                  <p className="text-xs text-gray-600 ml-4 mt-0.5">
+                    {new Date(room.created_at).toLocaleString('ko-KR')} · {room.status === 'open' ? '진행 중' : room.status === 'waiting' ? '대기 중' : '종료'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-4">
                   <button
-                    onClick={() => navigate(`/vote/${poll.id}`)}
+                    onClick={() => navigate(`/vote/${room.id}`)}
                     className="flex items-center gap-1.5 text-xs bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-gray-300 transition-colors"
-                    title="투표 페이지"
                   >
                     <ExternalLink size={13} /> 투표
                   </button>
                   <button
-                    onClick={() => navigate(`/display/${poll.id}`)}
+                    onClick={() => navigate(`/display/${room.id}`)}
                     className="flex items-center gap-1.5 text-xs bg-blue-900/50 hover:bg-blue-800/50 px-3 py-2 rounded-lg text-blue-300 transition-colors"
-                    title="발표 모드"
                   >
                     <Monitor size={13} /> 발표
                   </button>
                   <button
-                    onClick={() => toggleActive(poll)}
-                    className={`text-xs px-3 py-2 rounded-lg transition-colors ${poll.is_active ? 'bg-green-900/40 text-green-400 hover:bg-green-900/60' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                    onClick={() => toggleStatus(room)}
+                    className={`text-xs px-3 py-2 rounded-lg transition-colors ${
+                      room.status === 'open' ? 'bg-green-900/40 text-green-400 hover:bg-green-900/60' :
+                      room.status === 'waiting' ? 'bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900/60' :
+                      'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
                   >
-                    {poll.is_active ? '진행 중' : '종료됨'}
+                    {room.status === 'open' ? '진행 중' : room.status === 'waiting' ? '대기 중' : '종료됨'}
                   </button>
-                  <button onClick={() => deletePoll(poll.id)} className="text-gray-600 hover:text-red-400 p-2 transition-colors">
+                  <button onClick={() => deleteRoom(room.id)} className="text-gray-600 hover:text-red-400 p-2 transition-colors">
                     <Trash2 size={15} />
                   </button>
                 </div>

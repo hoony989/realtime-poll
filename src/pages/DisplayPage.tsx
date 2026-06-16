@@ -41,8 +41,8 @@ export default function DisplayPage() {
         </button>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm text-gray-400">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            실시간 집계 중
+            <div className={`w-2 h-2 rounded-full ${poll.status === 'open' ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`} />
+            {poll.status === 'open' ? '실시간 집계 중' : '집계 종료'}
           </div>
           <div className="flex items-center gap-1.5 bg-gray-800 text-gray-300 text-xs px-3 py-1.5 rounded-lg">
             <Users size={13} />
@@ -63,37 +63,34 @@ export default function DisplayPage() {
       <div className="flex-1 flex gap-0 overflow-hidden">
         <div className="flex-1 flex flex-col p-8 lg:p-12">
           <div className="mb-10">
-            <p className="text-blue-400 text-sm font-medium uppercase tracking-widest mb-3">구성원은 어떤 실행 과제를</p>
+            {poll.question && <p className="text-blue-400 text-sm font-medium mb-3">{poll.question}</p>}
             <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">{poll.title}</h1>
-            {poll.description && <p className="text-gray-400 mt-3 text-lg">{poll.description}</p>}
           </div>
 
-          <div className="flex-1 flex flex-col justify-center space-y-5">
+          <div className="flex-1 flex flex-col justify-center space-y-6">
             {poll.options.map((opt) => {
               const pct = poll.total_votes > 0 ? Math.round((opt.vote_count / poll.total_votes) * 100) : 0
               const barWidth = maxVotes > 0 ? (opt.vote_count / maxVotes) * 100 : 0
 
               return (
-                <div key={opt.id} className="flex items-center gap-5 group">
-                  <div className="w-56 lg:w-72 flex-shrink-0">
-                    <div className="flex items-center gap-2.5 mb-2">
+                <div key={opt.id} className="flex items-center gap-5">
+                  <div className="w-52 lg:w-64 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 mb-1.5">
                       <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />
-                      <span className="text-lg font-semibold text-white">{opt.text}</span>
+                      <span className="text-lg font-semibold text-white">{opt.label}</span>
                     </div>
                     <div className="flex items-center gap-2 ml-5.5">
-                      <div className="text-sm text-gray-400">{opt.vote_count}명</div>
-                      <div className="text-xs text-gray-600 ml-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${opt.color}20`, color: opt.color }}>
+                      <span className="text-sm text-gray-400">{opt.vote_count}명</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${opt.color}20`, color: opt.color }}>
                         {pct}%
-                      </div>
+                      </span>
                     </div>
                   </div>
-                  <div className="flex-1 h-12 bg-gray-900 rounded-2xl overflow-hidden relative">
+                  <div className="flex-1 h-12 bg-gray-900 rounded-2xl overflow-hidden">
                     <div
-                      className="h-full rounded-2xl transition-all duration-700 ease-out relative"
-                      style={{ width: `${barWidth}%`, backgroundColor: opt.color, opacity: 0.85 }}
-                    >
-                      <div className="absolute inset-0 rounded-2xl" style={{ background: `linear-gradient(90deg, ${opt.color}dd, ${opt.color}ff)` }} />
-                    </div>
+                      className="h-full rounded-2xl transition-all duration-700 ease-out"
+                      style={{ width: `${barWidth}%`, background: `linear-gradient(90deg, ${opt.color}cc, ${opt.color})` }}
+                    />
                   </div>
                 </div>
               )
@@ -106,17 +103,17 @@ export default function DisplayPage() {
               <div className="bg-white p-3 rounded-xl">
                 <QRCodeSVG value={voteUrl} size={120} />
               </div>
-              <p className="text-xs text-gray-600 mt-2 text-center font-mono break-all max-w-[148px]">{voteUrl.replace('https://', '')}</p>
+              <p className="text-xs text-gray-600 mt-2 text-center break-all max-w-[148px]">{voteUrl.replace('https://', '')}</p>
             </div>
-            <div className="text-gray-600 text-sm pb-2">
-              <p className="text-4xl font-bold text-white">{poll.total_votes}</p>
+            <div className="pb-2">
+              <p className="text-5xl font-bold text-white">{poll.total_votes}</p>
               <p className="text-gray-400 mt-1">총 참여자</p>
             </div>
           </div>
         </div>
 
-        {showOpinions && poll.allow_opinions && (
-          <div className="w-80 xl:w-96 border-l border-gray-800 flex flex-col bg-gray-900/50">
+        {showOpinions && (
+          <div className="w-80 xl:w-96 border-l border-gray-800 flex flex-col bg-gray-900/30">
             <div className="p-5 border-b border-gray-800">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -133,7 +130,7 @@ export default function DisplayPage() {
               ) : (
                 poll.opinions.map((op) => (
                   <div key={op.id} className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-3.5">
-                    <p className="text-sm text-gray-200 leading-relaxed">"{op.text}"</p>
+                    <p className="text-sm text-gray-200 leading-relaxed">"{op.content}"</p>
                     <p className="text-xs text-gray-600 mt-2">
                       {new Date(op.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
